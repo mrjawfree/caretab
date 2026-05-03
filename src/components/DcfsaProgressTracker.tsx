@@ -101,7 +101,7 @@ export function DcfsaProgressTracker({ careRecipientId, expenses, isOwner }: Dcf
     if (settings?.id) {
       const { error: err } = await supabase
         .from('dcfsa_settings')
-        .update({ annual_cap: parsed, updated_at: new Date().toISOString() })
+        .update({ annual_cap: parsed })
         .eq('id', settings.id)
 
       if (err) {
