@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../lib/types'
 import type { Expense, ExpenseCategory } from '../lib/types'
 import { ExpenseDetail } from './ExpenseDetail'
+import { exportCSV, exportPDF } from '../lib/exportLedger'
 
 interface ExpenseLedgerProps {
   expenses: Expense[]
+  filerName: string
   onLogExpense?: () => void
 }
 
@@ -17,11 +19,18 @@ function getAvailableYears(expenses: Expense[]): number[] {
   return Array.from(years).sort((a, b) => b - a)
 }
 
-export function ExpenseLedger({ expenses, onLogExpense }: ExpenseLedgerProps) {
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
+export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedgerProps) {
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | 'All'>('All')
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [startDate, setStartDate] = useState(`${currentYear}-01-01`)
+  const [endDate, setEndDate] = useState(toISODate(new Date()))
+  const [showExport, setShowExport] = useState(false)
 
   const availableYears = useMemo(() => getAvailableYears(expenses), [expenses])
 
@@ -40,6 +49,21 @@ export function ExpenseLedger({ expenses, onLogExpense }: ExpenseLedgerProps) {
       .reduce((sum, e) => sum + e.amount, 0)
   }, [expenses, selectedYear])
 
+  const exportExpenses = useMemo(() => {
+    return expenses
+      .filter(e => {
+        if (e.date < startDate || e.date > endDate) return false
+        if (selectedCategory !== 'All' && e.category !== selectedCategory) return false
+        return true
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [expenses, startDate, endDate, selectedCategory])
+
+  const exportTotal = useMemo(
+    () => exportExpenses.reduce((sum, e) => sum + e.amount, 0),
+    [exportExpenses],
+  )
+
   const groupedExpenses = useMemo(() => {
     const groups: Record<string, { expenses: Expense[]; subtotal: number }> = {}
     for (const cat of EXPENSE_CATEGORIES) {
@@ -53,6 +77,19 @@ export function ExpenseLedger({ expenses, onLogExpense }: ExpenseLedgerProps) {
     }
     return groups
   }, [filteredExpenses])
+
+  const handleExport = (format: 'pdf' | 'csv') => {
+    if (exportExpenses.length === 0) return
+    const opts = {
+      expenses: exportExpenses,
+      filerName,
+      startDate,
+      endDate,
+      totalAmount: exportTotal,
+    }
+    if (format === 'pdf') exportPDF(opts)
+    else exportCSV(opts)
+  }
 
   if (expenses.length === 0) {
     return (
@@ -101,7 +138,68 @@ export function ExpenseLedger({ expenses, onLogExpense }: ExpenseLedgerProps) {
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        <button
+          onClick={() => setShowExport(v => !v)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          aria-label="Export ledger"
+          title="Export"
+        >
+          ↓ Export
+        </button>
       </div>
+
+      {showExport && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-5">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Export Ledger</h4>
+          <div className="flex gap-3 mb-3">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Start date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">End date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          {startDate > endDate && (
+            <p className="text-xs text-red-500 mb-3">Start date must be before end date.</p>
+          )}
+          <p className="text-xs text-gray-500 mb-3">
+            {exportExpenses.length} expense{exportExpenses.length !== 1 ? 's' : ''} · {formatCurrency(exportTotal)}
+            {selectedCategory !== 'All' && ` · ${selectedCategory} only`}
+          </p>
+          {exportExpenses.length === 0 ? (
+            <p className="text-sm text-gray-400">No expenses found for this date range{selectedCategory !== 'All' ? ` and category` : ''}.</p>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleExport('pdf')}
+                disabled={startDate > endDate}
+                className="flex-1 bg-indigo-600 text-white text-sm font-medium rounded-lg px-4 py-2.5 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Download PDF
+              </button>
+              <button
+                onClick={() => handleExport('csv')}
+                disabled={startDate > endDate}
+                className="flex-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg px-4 py-2.5 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Download CSV
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {filteredExpenses.length === 0 ? (
         <div className="text-center py-8">
