@@ -18,7 +18,9 @@ const CareRecipientContext = createContext<CareRecipientContextValue | null>(nul
 export function CareRecipientProvider({ user, children }: { user: User; children: React.ReactNode }) {
   const [recipients, setRecipients] = useState<CareRecipient[]>([])
   const [sharedRecipients, setSharedRecipients] = useState<CareRecipient[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(() => {
+    try { return localStorage.getItem('caretab_active_recipient') } catch { return null }
+  })
   const [loading, setLoading] = useState(true)
 
   const fetchRecipients = useCallback(async () => {
@@ -50,6 +52,13 @@ export function CareRecipientProvider({ user, children }: { user: User; children
   useEffect(() => {
     fetchRecipients()
   }, [fetchRecipients])
+
+  useEffect(() => {
+    try {
+      if (activeId) localStorage.setItem('caretab_active_recipient', activeId)
+      else localStorage.removeItem('caretab_active_recipient')
+    } catch {}
+  }, [activeId])
 
   const allRecipients = [...recipients, ...sharedRecipients]
   const activeRecipient = activeId ? allRecipients.find(r => r.id === activeId) ?? null : null
