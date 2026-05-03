@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import type { MemberRole } from '../lib/types'
 
 interface InviteFormProps {
@@ -9,6 +10,7 @@ interface InviteFormProps {
 }
 
 export function InviteForm({ careRecipientId, onInvited, onCancel }: InviteFormProps) {
+  const { user } = useAuth()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MemberRole>('viewer')
   const [saving, setSaving] = useState(false)
@@ -20,6 +22,12 @@ export function InviteForm({ careRecipientId, onInvited, onCancel }: InviteFormP
     setError(null)
 
     const trimmedEmail = email.trim().toLowerCase()
+
+    if (trimmedEmail === user?.email?.toLowerCase()) {
+      setError('You cannot invite yourself.')
+      setSaving(false)
+      return
+    }
 
     const { error: insertError } = await supabase
       .from('care_recipient_members')
