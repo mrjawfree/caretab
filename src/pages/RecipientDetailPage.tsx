@@ -7,6 +7,7 @@ import { ExpenseForm } from '../components/ExpenseForm'
 import { ExpenseLedger } from '../components/ExpenseLedger'
 import { InviteForm } from '../components/InviteForm'
 import { MembersList } from '../components/MembersList'
+import { DcfsaProgressTracker } from '../components/DcfsaProgressTracker'
 import type { CareRecipient, Expense, CareRecipientMember, MemberRole } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -172,6 +173,12 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
             />
           </>
         )}
+
+        <DcfsaProgressTracker
+          careRecipientId={recipient.id}
+          expenses={expenses}
+          isOwner={isOwner}
+        />
 
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">Expense Ledger</h3>
