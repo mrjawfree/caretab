@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useCareRecipients } from '../contexts/CareRecipientContext'
+import { Header } from '../components/Header'
 import { ExpenseForm } from '../components/ExpenseForm'
 import { ExpenseLedger } from '../components/ExpenseLedger'
 import { InviteForm } from '../components/InviteForm'
@@ -16,6 +18,7 @@ interface RecipientDetailPageProps {
 export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProps) {
   const { recipientId } = useParams<{ recipientId: string }>()
   const navigate = useNavigate()
+  const { setActiveRecipientId } = useCareRecipients()
   const [recipient, setRecipient] = useState<CareRecipient | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [members, setMembers] = useState<CareRecipientMember[]>([])
@@ -28,6 +31,10 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
 
   const isOwner = recipient?.owner_user_id === user.id
   const canEdit = isOwner || myRole === 'editor'
+
+  useEffect(() => {
+    if (recipientId) setActiveRecipientId(recipientId)
+  }, [recipientId, setActiveRecipientId])
 
   const fetchData = async () => {
     if (!recipientId) return
@@ -103,26 +110,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Back to home"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold text-indigo-600">CareTab</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500 hidden sm:inline">{user.email}</span>
-          <button onClick={onSignOut} className="text-sm text-gray-500 hover:text-gray-700 font-medium">
-            Sign out
-          </button>
-        </div>
-      </header>
+      <Header user={user} onSignOut={onSignOut} showBack />
 
       <main className="max-w-lg mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
