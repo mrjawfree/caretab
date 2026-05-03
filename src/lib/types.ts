@@ -36,9 +36,12 @@ export interface Expense {
   vendor: string
   notes: string | null
   receipt_url: string | null
+  reimbursed: boolean
   created_by: string
   created_at: string
 }
+
+export type ReimbursementFilter = 'All' | 'Reimbursed' | 'Unreimbursed'
 
 export type MemberRole = 'owner' | 'editor' | 'viewer'
 export type MemberStatus = 'pending' | 'accepted'

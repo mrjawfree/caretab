@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { Expense } from './types'
+import type { Expense, ReimbursementFilter } from './types'
 
 interface ExportOptions {
   expenses: Expense[]
@@ -9,6 +9,7 @@ interface ExportOptions {
   endDate: string
   totalAmount: number
   spansMultipleYears?: boolean
+  reimbursementFilter?: ReimbursementFilter
 }
 
 function buildFilename(startDate: string, endDate: string, ext: string): string {
@@ -38,13 +39,14 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-export function exportCSV({ expenses, filerName, startDate, endDate, totalAmount, spansMultipleYears }: ExportOptions) {
-  const headers = ['Date', 'Vendor', 'Category', 'Amount', 'Notes', 'Receipt URL']
+export function exportCSV({ expenses, filerName, startDate, endDate, totalAmount, spansMultipleYears, reimbursementFilter = 'All' }: ExportOptions) {
+  const headers = ['Date', 'Vendor', 'Category', 'Amount', 'Reimbursed', 'Notes', 'Receipt URL']
   const rows = expenses.map(e => [
     e.date,
     e.vendor,
     e.category,
     e.amount.toFixed(2),
+    e.reimbursed ? 'Yes' : 'No',
     e.notes ?? '',
     e.receipt_url ?? '',
   ])
@@ -56,11 +58,16 @@ export function exportCSV({ expenses, filerName, startDate, endDate, totalAmount
     return val
   }
 
+  const filterNote = reimbursementFilter === 'Reimbursed' ? '# Filter: Reimbursed expenses only'
+    : reimbursementFilter === 'Unreimbursed' ? '# Filter: Unreimbursed expenses only'
+    : null
+
   const lines = [
     `# CareTab Ledger Export — ${filerName}`,
     `# Date Range: ${formatDate(startDate)} – ${formatDate(endDate)}`,
     `# Total: ${formatCurrency(totalAmount)}`,
     ...(spansMultipleYears ? ['# Note: Export spans multiple plan years'] : []),
+    ...(filterNote ? [filterNote] : []),
     '',
     headers.map(escapeCsv).join(','),
     ...rows.map(row => row.map(escapeCsv).join(',')),
@@ -97,7 +104,7 @@ function groupExpensesByYear(expenses: Expense[]): Map<number, Expense[]> {
   return new Map([...groups.entries()].sort(([a], [b]) => a - b))
 }
 
-export async function exportPDF({ expenses, filerName, startDate, endDate, totalAmount, spansMultipleYears }: ExportOptions) {
+export async function exportPDF({ expenses, filerName, startDate, endDate, totalAmount, spansMultipleYears, reimbursementFilter = 'All' }: ExportOptions) {
   const receiptUrls = expenses.map(e => e.receipt_url).filter(Boolean) as string[]
   const imageCache = new Map<string, string>()
   const imageResults = await Promise.allSettled(
@@ -125,6 +132,14 @@ export async function exportPDF({ expenses, filerName, startDate, endDate, total
     doc.setTextColor(180, 130, 20)
     doc.text('Export spans multiple plan years', 14, 44)
     headerY = 51
+  }
+
+  if (reimbursementFilter !== 'All') {
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    const filterLabel = reimbursementFilter === 'Reimbursed' ? 'Reimbursed expenses only' : 'Unreimbursed expenses only'
+    doc.text(filterLabel, 14, headerY)
+    headerY += 7
   }
 
   doc.setFontSize(14)
@@ -156,13 +171,14 @@ export async function exportPDF({ expenses, filerName, startDate, endDate, total
         e.vendor,
         e.category,
         formatCurrency(e.amount),
+        e.reimbursed ? 'Yes' : 'No',
         e.notes ?? '—',
         '',
       ])
 
       autoTable(doc, {
         startY: currentY,
-        head: [['Date', 'Vendor', 'Category', 'Amount', 'Notes', 'Receipt']],
+        head: [['Date', 'Vendor', 'Category', 'Amount', 'Reimbursed', 'Notes', 'Receipt']],
         body: tableRows,
         styles: { fontSize: 9, cellPadding: 3 },
         headStyles: {
@@ -173,11 +189,12 @@ export async function exportPDF({ expenses, filerName, startDate, endDate, total
         alternateRowStyles: { fillColor: [245, 243, 255] },
         columnStyles: {
           3: { halign: 'right' },
-          4: { cellWidth: 40 },
-          5: { cellWidth: hasAnyReceipts ? 20 : 12 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 35 },
+          6: { cellWidth: hasAnyReceipts ? 20 : 12 },
         },
         didDrawCell(data) {
-          if (data.section !== 'body' || data.column.index !== 5) return
+          if (data.section !== 'body' || data.column.index !== 6) return
           const expense = yearExpenses[data.row.index]
           if (!expense?.receipt_url) {
             doc.setFontSize(9)
@@ -213,13 +230,14 @@ export async function exportPDF({ expenses, filerName, startDate, endDate, total
       e.vendor,
       e.category,
       formatCurrency(e.amount),
+      e.reimbursed ? 'Yes' : 'No',
       e.notes ?? '—',
       '',
     ])
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Date', 'Vendor', 'Category', 'Amount', 'Notes', 'Receipt']],
+      head: [['Date', 'Vendor', 'Category', 'Amount', 'Reimbursed', 'Notes', 'Receipt']],
       body: tableRows,
       styles: { fontSize: 9, cellPadding: 3 },
       headStyles: {
@@ -230,11 +248,12 @@ export async function exportPDF({ expenses, filerName, startDate, endDate, total
       alternateRowStyles: { fillColor: [245, 243, 255] },
       columnStyles: {
         3: { halign: 'right' },
-        4: { cellWidth: 40 },
-        5: { cellWidth: hasAnyReceipts ? 20 : 12 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 35 },
+        6: { cellWidth: hasAnyReceipts ? 20 : 12 },
       },
       didDrawCell(data) {
-        if (data.section !== 'body' || data.column.index !== 5) return
+        if (data.section !== 'body' || data.column.index !== 6) return
         const expense = expenses[data.row.index]
         if (!expense?.receipt_url) {
           doc.setFontSize(9)

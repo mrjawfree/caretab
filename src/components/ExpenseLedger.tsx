@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../lib/types'
-import type { Expense, ExpenseCategory } from '../lib/types'
+import type { Expense, ExpenseCategory, ReimbursementFilter } from '../lib/types'
 import { ExpenseDetail } from './ExpenseDetail'
 import { exportCSV, exportPDF } from '../lib/exportLedger'
 
@@ -40,6 +40,7 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
   const [startDate, setStartDate] = useState(`${earliestYear}-01-01`)
   const [endDate, setEndDate] = useState(toISODate(new Date()))
   const [showExport, setShowExport] = useState(false)
+  const [reimbursementFilter, setReimbursementFilter] = useState<ReimbursementFilter>('All')
 
   const availableYears = useMemo(() => getAvailableYears(expenses), [expenses])
 
@@ -63,10 +64,12 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
       .filter(e => {
         if (e.date < startDate || e.date > endDate) return false
         if (selectedCategory !== 'All' && e.category !== selectedCategory) return false
+        if (reimbursementFilter === 'Reimbursed' && !e.reimbursed) return false
+        if (reimbursementFilter === 'Unreimbursed' && e.reimbursed) return false
         return true
       })
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [expenses, startDate, endDate, selectedCategory])
+  }, [expenses, startDate, endDate, selectedCategory, reimbursementFilter])
 
   const exportTotal = useMemo(
     () => exportExpenses.reduce((sum, e) => sum + e.amount, 0),
@@ -103,6 +106,7 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
       endDate,
       totalAmount: exportTotal,
       spansMultipleYears: exportYears.length > 1,
+      reimbursementFilter,
     }
     if (format === 'pdf') {
       setExporting(true)
@@ -196,12 +200,26 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
               />
             </div>
           </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">Reimbursement status</label>
+            <select
+              value={reimbursementFilter}
+              onChange={e => setReimbursementFilter(e.target.value as ReimbursementFilter)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              aria-label="Filter by reimbursement status"
+            >
+              <option value="All">All</option>
+              <option value="Reimbursed">Reimbursed only</option>
+              <option value="Unreimbursed">Unreimbursed only</option>
+            </select>
+          </div>
           {startDate > endDate && (
             <p className="text-xs text-red-500 mb-3">Start date must be before end date.</p>
           )}
           <p className="text-xs text-gray-500 mb-3">
             {exportExpenses.length} expense{exportExpenses.length !== 1 ? 's' : ''} · {formatCurrency(exportTotal)}
             {selectedCategory !== 'All' && ` · ${selectedCategory} only`}
+            {reimbursementFilter !== 'All' && ` · ${reimbursementFilter} only`}
           </p>
           {exportExpenses.length === 0 ? (
             <p className="text-sm text-gray-400">No expenses found for this date range{selectedCategory !== 'All' ? ` and category` : ''}.</p>
