@@ -209,6 +209,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
 
         <ExpenseLedger
           expenses={expenses}
+          filerName={recipient.name}
           onLogExpense={canEdit ? () => setShowForm(true) : undefined}
         />
       </main>
