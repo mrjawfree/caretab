@@ -23,12 +23,21 @@ function toISODate(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+function getEarliestYear(expenses: Expense[]): number {
+  if (expenses.length === 0) return new Date().getFullYear()
+  return expenses.reduce((min, e) => {
+    const y = new Date(e.date).getFullYear()
+    return y < min ? y : min
+  }, new Date().getFullYear())
+}
+
 export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedgerProps) {
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | 'All'>('All')
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
-  const [startDate, setStartDate] = useState(`${currentYear}-01-01`)
+  const earliestYear = useMemo(() => getEarliestYear(expenses), [expenses])
+  const [startDate, setStartDate] = useState(`${earliestYear}-01-01`)
   const [endDate, setEndDate] = useState(toISODate(new Date()))
   const [showExport, setShowExport] = useState(false)
 
@@ -78,6 +87,11 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
     return groups
   }, [filteredExpenses])
 
+  const exportYears = useMemo(() => {
+    const years = new Set(exportExpenses.map(e => new Date(e.date).getFullYear()))
+    return Array.from(years).sort((a, b) => a - b)
+  }, [exportExpenses])
+
   const [exporting, setExporting] = useState(false)
 
   const handleExport = async (format: 'pdf' | 'csv') => {
@@ -88,6 +102,7 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
       startDate,
       endDate,
       totalAmount: exportTotal,
+      spansMultipleYears: exportYears.length > 1,
     }
     if (format === 'pdf') {
       setExporting(true)
