@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { CareRecipient } from '../lib/types'
+import { useCareRecipients } from '../contexts/CareRecipientContext'
+import { Header } from '../components/Header'
 import type { User } from '@supabase/supabase-js'
 
 interface HomePageProps {
@@ -11,9 +12,7 @@ interface HomePageProps {
 
 export function HomePage({ user, onSignOut }: HomePageProps) {
   const navigate = useNavigate()
-  const [recipients, setRecipients] = useState<CareRecipient[]>([])
-  const [sharedRecipients, setSharedRecipients] = useState<CareRecipient[]>([])
-  const [loading, setLoading] = useState(true)
+  const { recipients, sharedRecipients, loading, refresh, setActiveRecipientId } = useCareRecipients()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [relationship, setRelationship] = useState('')
@@ -21,40 +20,6 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const fetchRecipients = async () => {
-    const [ownedRes, sharedRes] = await Promise.all([
-      supabase
-        .from('care_recipients')
-        .select('*')
-        .eq('owner_user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('care_recipient_members')
-        .select('care_recipient_id, role, care_recipients(*)')
-        .eq('user_id', user.id)
-        .eq('status', 'accepted')
-        .neq('role', 'owner'),
-    ])
-
-    if (ownedRes.error) {
-      setError(ownedRes.error.message)
-    } else {
-      setRecipients(ownedRes.data ?? [])
-    }
-
-    if (sharedRes.data) {
-      const shared = sharedRes.data
-        .map((m: any) => m.care_recipients)
-        .filter(Boolean) as CareRecipient[]
-      setSharedRecipients(shared)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    fetchRecipients()
-  }, [user.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,25 +42,21 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
       setDateOfBirth('')
       setNotes('')
       setShowForm(false)
-      await fetchRecipients()
+      await refresh()
     }
     setSaving(false)
   }
 
+  const handleSelectRecipient = (id: string) => {
+    setActiveRecipientId(id)
+    navigate(`/recipient/${id}`)
+  }
+
+  const allCount = recipients.length + sharedRecipients.length
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-indigo-600">CareTab</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500 hidden sm:inline">{user.email}</span>
-          <button
-            onClick={onSignOut}
-            className="text-sm text-gray-500 hover:text-gray-700 font-medium"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      <Header user={user} onSignOut={onSignOut} />
 
       <main className="max-w-lg mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -205,7 +166,7 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
             {recipients.map(r => (
               <button
                 key={r.id}
-                onClick={() => navigate(`/recipient/${r.id}`)}
+                onClick={() => handleSelectRecipient(r.id)}
                 className="w-full text-left bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between">
@@ -241,7 +202,7 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
               {sharedRecipients.map(r => (
                 <button
                   key={r.id}
-                  onClick={() => navigate(`/recipient/${r.id}`)}
+                  onClick={() => handleSelectRecipient(r.id)}
                   className="w-full text-left bg-white rounded-xl shadow-sm border border-indigo-100 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between">
@@ -264,6 +225,15 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
               ))}
             </div>
           </>
+        )}
+
+        {allCount > 0 && !showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full mt-6 border-2 border-dashed border-gray-300 rounded-xl p-4 text-sm font-medium text-gray-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+          >
+            + Add another care recipient
+          </button>
         )}
       </main>
     </div>
