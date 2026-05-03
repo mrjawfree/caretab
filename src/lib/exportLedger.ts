@@ -68,7 +68,33 @@ export function exportCSV({ expenses, filerName, startDate, endDate, totalAmount
   triggerDownload(blob, buildFilename(startDate, endDate, 'csv'))
 }
 
-export function exportPDF({ expenses, filerName, startDate, endDate, totalAmount }: ExportOptions) {
+async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+export async function exportPDF({ expenses, filerName, startDate, endDate, totalAmount }: ExportOptions) {
+  const receiptUrls = expenses.map(e => e.receipt_url).filter(Boolean) as string[]
+  const imageCache = new Map<string, string>()
+  const imageResults = await Promise.allSettled(
+    receiptUrls.map(async url => {
+      const dataUrl = await fetchImageAsDataUrl(url)
+      if (dataUrl) imageCache.set(url, dataUrl)
+    }),
+  )
+  void imageResults
+
   const doc = new jsPDF()
 
   doc.setFontSize(18)
@@ -87,13 +113,15 @@ export function exportPDF({ expenses, filerName, startDate, endDate, totalAmount
   doc.setDrawColor(200, 200, 200)
   doc.line(14, 51, 196, 51)
 
+  const hasAnyReceipts = expenses.some(e => e.receipt_url && imageCache.has(e.receipt_url))
+
   const tableRows = expenses.map(e => [
     formatDate(e.date),
     e.vendor,
     e.category,
     formatCurrency(e.amount),
     e.notes ?? '—',
-    e.receipt_url ? 'Yes' : '—',
+    '',
   ])
 
   autoTable(doc, {
@@ -110,6 +138,34 @@ export function exportPDF({ expenses, filerName, startDate, endDate, totalAmount
     columnStyles: {
       3: { halign: 'right' },
       4: { cellWidth: 40 },
+      5: { cellWidth: hasAnyReceipts ? 20 : 12 },
+    },
+    didDrawCell(data) {
+      if (data.section !== 'body' || data.column.index !== 5) return
+      const expense = expenses[data.row.index]
+      if (!expense?.receipt_url) {
+        doc.setFontSize(9)
+        doc.setTextColor(160, 160, 160)
+        doc.text('—', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 3)
+        return
+      }
+      const dataUrl = imageCache.get(expense.receipt_url)
+      if (dataUrl) {
+        const imgSize = Math.min(data.cell.height - 2, 16)
+        const x = data.cell.x + 2
+        const y = data.cell.y + (data.cell.height - imgSize) / 2
+        try {
+          doc.addImage(dataUrl, x, y, imgSize, imgSize)
+        } catch {
+          doc.setFontSize(7)
+          doc.setTextColor(100, 100, 100)
+          doc.text('img', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 2)
+        }
+      } else {
+        doc.setFontSize(7)
+        doc.setTextColor(100, 100, 100)
+        doc.text('receipt', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 2)
+      }
     },
   })
 

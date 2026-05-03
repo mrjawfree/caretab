@@ -78,7 +78,9 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
     return groups
   }, [filteredExpenses])
 
-  const handleExport = (format: 'pdf' | 'csv') => {
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async (format: 'pdf' | 'csv') => {
     if (exportExpenses.length === 0) return
     const opts = {
       expenses: exportExpenses,
@@ -87,8 +89,16 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
       endDate,
       totalAmount: exportTotal,
     }
-    if (format === 'pdf') exportPDF(opts)
-    else exportCSV(opts)
+    if (format === 'pdf') {
+      setExporting(true)
+      try {
+        await exportPDF(opts)
+      } finally {
+        setExporting(false)
+      }
+    } else {
+      exportCSV(opts)
+    }
   }
 
   if (expenses.length === 0) {
@@ -184,10 +194,10 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
             <div className="flex gap-3">
               <button
                 onClick={() => handleExport('pdf')}
-                disabled={startDate > endDate}
+                disabled={startDate > endDate || exporting}
                 className="flex-1 bg-indigo-600 text-white text-sm font-medium rounded-lg px-4 py-2.5 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Download PDF
+                {exporting ? 'Preparing…' : 'Download PDF'}
               </button>
               <button
                 onClick={() => handleExport('csv')}
