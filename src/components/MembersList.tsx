@@ -14,7 +14,15 @@ const roleBadge: Record<string, { label: string; className: string }> = {
 }
 
 export function MembersList({ members, isOwner, onRemoved }: MembersListProps) {
-  if (members.length === 0) return null
+  if (members.length === 0) {
+    return (
+      <div className="mb-6">
+        <div className="text-center py-8 bg-white rounded-xl shadow-sm border border-gray-200">
+          <p className="text-gray-400 text-sm">No members yet</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleRemove = async (memberId: string) => {
     await supabase.from('care_recipient_members').delete().eq('id', memberId)
