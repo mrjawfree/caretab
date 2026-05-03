@@ -42,6 +42,7 @@ export function DcfsaProgressTracker({ careRecipientId, expenses, isOwner }: Dcf
   const [capInput, setCapInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const fetchSettings = useCallback(async () => {
     const { data } = await supabase
@@ -66,6 +67,12 @@ export function DcfsaProgressTracker({ careRecipientId, expenses, isOwner }: Dcf
   useEffect(() => {
     fetchSettings()
   }, [fetchSettings])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const startMonth = settings?.benefit_year_start_month ?? 1
   const annualCap = settings?.annual_cap ?? 3000
@@ -109,6 +116,7 @@ export function DcfsaProgressTracker({ careRecipientId, expenses, isOwner }: Dcf
       } else {
         setSettings({ ...settings, annual_cap: parsed })
         setEditing(false)
+        setToast('Annual cap updated')
       }
     } else {
       const { data, error: err } = await supabase
@@ -122,15 +130,42 @@ export function DcfsaProgressTracker({ careRecipientId, expenses, isOwner }: Dcf
       } else if (data) {
         setSettings(data)
         setEditing(false)
+        setToast('Annual cap saved')
       }
     }
     setSaving(false)
   }
 
-  if (loading) return null
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 animate-pulse">
+        <div className="flex items-center justify-between mb-3">
+          <div className="h-5 w-32 bg-gray-200 rounded" />
+          <div className="h-4 w-16 bg-gray-200 rounded" />
+        </div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="h-8 w-24 bg-gray-200 rounded" />
+          <div className="h-4 w-20 bg-gray-200 rounded" />
+        </div>
+        <div className="w-full h-3 bg-gray-100 rounded-full mb-2" />
+        <div className="flex items-center justify-between">
+          <div className="h-3 w-16 bg-gray-200 rounded" />
+          <div className="h-3 w-24 bg-gray-200 rounded" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+      {toast && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+          <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          {toast}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-gray-900">DCFSA Progress</h3>
         {isOwner && !editing && (
