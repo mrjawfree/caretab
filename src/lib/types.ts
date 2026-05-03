@@ -39,3 +39,16 @@ export interface Expense {
   created_by: string
   created_at: string
 }
+
+export type MemberRole = 'owner' | 'editor' | 'viewer'
+export type MemberStatus = 'pending' | 'accepted'
+
+export interface CareRecipientMember {
+  id: string
+  care_recipient_id: string
+  user_id: string | null
+  role: MemberRole
+  invited_email: string | null
+  status: MemberStatus
+  created_at: string
+}

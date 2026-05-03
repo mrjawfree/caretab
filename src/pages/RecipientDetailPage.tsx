@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ExpenseForm } from '../components/ExpenseForm'
 import { ExpenseLedger } from '../components/ExpenseLedger'
-import type { CareRecipient, Expense } from '../lib/types'
+import { InviteForm } from '../components/InviteForm'
+import { MembersList } from '../components/MembersList'
+import type { CareRecipient, Expense, CareRecipientMember, MemberRole } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
 interface RecipientDetailPageProps {
@@ -16,29 +18,47 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
   const navigate = useNavigate()
   const [recipient, setRecipient] = useState<CareRecipient | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [members, setMembers] = useState<CareRecipientMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
   const [confirmation, setConfirmation] = useState(false)
+  const [inviteConfirmation, setInviteConfirmation] = useState(false)
+  const [myRole, setMyRole] = useState<MemberRole | null>(null)
+
+  const isOwner = recipient?.owner_user_id === user.id
+  const canEdit = isOwner || myRole === 'editor'
 
   const fetchData = async () => {
     if (!recipientId) return
 
-    const [recipientRes, expensesRes] = await Promise.all([
+    const [recipientRes, expensesRes, membersRes] = await Promise.all([
       supabase
         .from('care_recipients')
         .select('*')
         .eq('id', recipientId)
-        .eq('owner_user_id', user.id)
         .single(),
       supabase
         .from('expenses')
         .select('*')
         .eq('care_recipient_id', recipientId)
         .order('date', { ascending: false }),
+      supabase
+        .from('care_recipient_members')
+        .select('*')
+        .eq('care_recipient_id', recipientId)
+        .order('created_at', { ascending: true }),
     ])
 
     if (recipientRes.data) setRecipient(recipientRes.data)
     if (expensesRes.data) setExpenses(expensesRes.data)
+    if (membersRes.data) {
+      setMembers(membersRes.data)
+      const me = membersRes.data.find(
+        (m: CareRecipientMember) => m.user_id === user.id && m.status === 'accepted'
+      )
+      setMyRole(me?.role ?? null)
+    }
     setLoading(false)
   }
 
@@ -50,6 +70,13 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
     setShowForm(false)
     setConfirmation(true)
     setTimeout(() => setConfirmation(false), 3000)
+    fetchData()
+  }
+
+  const handleInvited = () => {
+    setShowInvite(false)
+    setInviteConfirmation(true)
+    setTimeout(() => setInviteConfirmation(false), 3000)
     fetchData()
   }
 
@@ -99,23 +126,68 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
 
       <main className="max-w-lg mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">{recipient.name}</h2>
-          {recipient.relationship && (
-            <p className="text-sm text-gray-500 mt-0.5">{recipient.relationship}</p>
-          )}
-          {recipient.date_of_birth && (
-            <p className="text-xs text-gray-400 mt-1">
-              DOB: {new Date(recipient.date_of_birth).toLocaleDateString()}
-            </p>
-          )}
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{recipient.name}</h2>
+              {recipient.relationship && (
+                <p className="text-sm text-gray-500 mt-0.5">{recipient.relationship}</p>
+              )}
+              {recipient.date_of_birth && (
+                <p className="text-xs text-gray-400 mt-1">
+                  DOB: {new Date(recipient.date_of_birth).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            {!isOwner && myRole && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
+                {myRole}
+              </span>
+            )}
+          </div>
           {recipient.notes && (
             <p className="text-sm text-gray-600 mt-2 border-t border-gray-100 pt-2">{recipient.notes}</p>
           )}
         </div>
 
+        {isOwner && (
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-900">Family members</h3>
+              {!showInvite && (
+                <button
+                  onClick={() => setShowInvite(true)}
+                  className="text-indigo-600 text-sm font-medium hover:text-indigo-700 transition-colors"
+                >
+                  + Invite member
+                </button>
+              )}
+            </div>
+
+            {inviteConfirmation && (
+              <div className="bg-green-50 text-green-700 text-sm rounded-lg p-3 mb-4">
+                Invite sent successfully.
+              </div>
+            )}
+
+            {showInvite && (
+              <InviteForm
+                careRecipientId={recipient.id}
+                onInvited={handleInvited}
+                onCancel={() => setShowInvite(false)}
+              />
+            )}
+
+            <MembersList
+              members={members.filter(m => m.role !== 'owner')}
+              isOwner={isOwner}
+              onRemoved={fetchData}
+            />
+          </>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">Expense Ledger</h3>
-          {!showForm && (
+          {!showForm && canEdit && (
             <button
               onClick={() => setShowForm(true)}
               className="bg-indigo-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-indigo-700 transition-colors"
@@ -131,7 +203,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
           </div>
         )}
 
-        {showForm && (
+        {showForm && canEdit && (
           <ExpenseForm
             careRecipientId={recipient.id}
             userId={user.id}
@@ -142,7 +214,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
 
         <ExpenseLedger
           expenses={expenses}
-          onLogExpense={() => setShowForm(true)}
+          onLogExpense={canEdit ? () => setShowForm(true) : undefined}
         />
       </main>
     </div>

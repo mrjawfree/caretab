@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { useAcceptInvites } from './hooks/useAcceptInvites'
 import { AuthPage } from './pages/AuthPage'
 import { HomePage } from './pages/HomePage'
 import { RecipientDetailPage } from './pages/RecipientDetailPage'
 
 function App() {
   const { user, loading, signUp, signIn, signOut } = useAuth()
+  useAcceptInvites(user)
 
   if (loading) {
     return (

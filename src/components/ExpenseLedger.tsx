@@ -5,7 +5,7 @@ import { ExpenseDetail } from './ExpenseDetail'
 
 interface ExpenseLedgerProps {
   expenses: Expense[]
-  onLogExpense: () => void
+  onLogExpense?: () => void
 }
 
 const formatCurrency = (n: number) =>
@@ -58,12 +58,14 @@ export function ExpenseLedger({ expenses, onLogExpense }: ExpenseLedgerProps) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-400 mb-2">No expenses logged yet</p>
-        <button
-          onClick={onLogExpense}
-          className="mt-3 bg-indigo-600 text-white text-sm font-medium rounded-lg px-5 py-2.5 hover:bg-indigo-700 transition-colors"
-        >
-          Log first expense
-        </button>
+        {onLogExpense && (
+          <button
+            onClick={onLogExpense}
+            className="mt-3 bg-indigo-600 text-white text-sm font-medium rounded-lg px-5 py-2.5 hover:bg-indigo-700 transition-colors"
+          >
+            Log first expense
+          </button>
+        )}
       </div>
     )
   }

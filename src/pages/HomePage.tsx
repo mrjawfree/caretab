@@ -12,6 +12,7 @@ interface HomePageProps {
 export function HomePage({ user, onSignOut }: HomePageProps) {
   const navigate = useNavigate()
   const [recipients, setRecipients] = useState<CareRecipient[]>([])
+  const [sharedRecipients, setSharedRecipients] = useState<CareRecipient[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -22,16 +23,31 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
   const [error, setError] = useState<string | null>(null)
 
   const fetchRecipients = async () => {
-    const { data, error } = await supabase
-      .from('care_recipients')
-      .select('*')
-      .eq('owner_user_id', user.id)
-      .order('created_at', { ascending: false })
+    const [ownedRes, sharedRes] = await Promise.all([
+      supabase
+        .from('care_recipients')
+        .select('*')
+        .eq('owner_user_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('care_recipient_members')
+        .select('care_recipient_id, role, care_recipients(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'accepted')
+        .neq('role', 'owner'),
+    ])
 
-    if (error) {
-      setError(error.message)
+    if (ownedRes.error) {
+      setError(ownedRes.error.message)
     } else {
-      setRecipients(data ?? [])
+      setRecipients(ownedRes.data ?? [])
+    }
+
+    if (sharedRes.data) {
+      const shared = sharedRes.data
+        .map((m: any) => m.care_recipients)
+        .filter(Boolean) as CareRecipient[]
+      setSharedRecipients(shared)
     }
     setLoading(false)
   }
@@ -216,6 +232,38 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
               </button>
             ))}
           </div>
+        )}
+
+        {sharedRecipients.length > 0 && (
+          <>
+            <h2 className="text-lg font-semibold text-gray-900 mt-8 mb-4">Shared with you</h2>
+            <div className="space-y-3">
+              {sharedRecipients.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => navigate(`/recipient/${r.id}`)}
+                  className="w-full text-left bg-white rounded-xl shadow-sm border border-indigo-100 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{r.name}</h3>
+                      {r.relationship && (
+                        <p className="text-sm text-gray-500 mt-0.5">{r.relationship}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full font-medium">
+                        Shared
+                      </span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </main>
     </div>
