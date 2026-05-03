@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { CareRecipient } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
@@ -9,6 +10,7 @@ interface HomePageProps {
 }
 
 export function HomePage({ user, onSignOut }: HomePageProps) {
+  const navigate = useNavigate()
   const [recipients, setRecipients] = useState<CareRecipient[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -185,7 +187,11 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
         ) : (
           <div className="space-y-3">
             {recipients.map(r => (
-              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <button
+                key={r.id}
+                onClick={() => navigate(`/recipient/${r.id}`)}
+                className="w-full text-left bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{r.name}</h3>
@@ -193,16 +199,21 @@ export function HomePage({ user, onSignOut }: HomePageProps) {
                       <p className="text-sm text-gray-500 mt-0.5">{r.relationship}</p>
                     )}
                   </div>
-                  {r.date_of_birth && (
-                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                      DOB: {new Date(r.date_of_birth).toLocaleDateString()}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {r.date_of_birth && (
+                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                        DOB: {new Date(r.date_of_birth).toLocaleDateString()}
+                      </span>
+                    )}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
                 {r.notes && (
                   <p className="text-sm text-gray-600 mt-2 border-t border-gray-100 pt-2">{r.notes}</p>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}
