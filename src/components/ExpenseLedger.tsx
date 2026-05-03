@@ -104,13 +104,13 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
   if (expenses.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400 mb-2">No expenses logged yet</p>
+        <p className="text-gray-400 mb-2">No expenses yet</p>
         {onLogExpense && (
           <button
             onClick={onLogExpense}
             className="mt-3 bg-indigo-600 text-white text-sm font-medium rounded-lg px-5 py-2.5 hover:bg-indigo-700 transition-colors"
           >
-            Log first expense
+            Add your first expense
           </button>
         )}
       </div>

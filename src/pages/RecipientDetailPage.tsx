@@ -170,6 +170,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
               members={members.filter(m => m.role !== 'owner')}
               isOwner={isOwner}
               onRemoved={fetchData}
+              onInvite={() => setShowInvite(true)}
             />
           </>
         )}

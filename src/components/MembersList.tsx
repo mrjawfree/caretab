@@ -5,6 +5,7 @@ interface MembersListProps {
   members: CareRecipientMember[]
   isOwner: boolean
   onRemoved: () => void
+  onInvite?: () => void
 }
 
 const roleBadge: Record<string, { label: string; className: string }> = {
@@ -13,12 +14,20 @@ const roleBadge: Record<string, { label: string; className: string }> = {
   viewer: { label: 'Viewer', className: 'bg-gray-100 text-gray-600' },
 }
 
-export function MembersList({ members, isOwner, onRemoved }: MembersListProps) {
+export function MembersList({ members, isOwner, onRemoved, onInvite }: MembersListProps) {
   if (members.length === 0) {
     return (
       <div className="mb-6">
         <div className="text-center py-8 bg-white rounded-xl shadow-sm border border-gray-200">
-          <p className="text-gray-400 text-sm">No members yet</p>
+          <p className="text-gray-400 text-sm mb-3">No members yet</p>
+          {isOwner && onInvite && (
+            <button
+              onClick={onInvite}
+              className="bg-indigo-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-indigo-700 transition-colors"
+            >
+              Invite a member
+            </button>
+          )}
         </div>
       </div>
     )
