@@ -17,6 +17,7 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
   const [vendor, setVendor] = useState('')
   const [notes, setNotes] = useState('')
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [reimbursed, setReimbursed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -89,6 +90,7 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
         vendor: vendor.trim(),
         notes: notes.trim() || null,
         receipt_url,
+        reimbursed,
         created_by: userId,
       })
 
@@ -190,6 +192,24 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
           placeholder="Optional details..."
         />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <label htmlFor="reimbursed" className="text-sm font-medium text-gray-700">
+          Reimbursed
+        </label>
+        <button
+          id="reimbursed"
+          type="button"
+          role="switch"
+          aria-checked={reimbursed}
+          onClick={() => setReimbursed(!reimbursed)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reimbursed ? 'bg-indigo-600' : 'bg-gray-200'}`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${reimbursed ? 'translate-x-6' : 'translate-x-1'}`}
+          />
+        </button>
       </div>
 
       <div>

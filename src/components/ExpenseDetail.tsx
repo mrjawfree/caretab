@@ -35,6 +35,19 @@ export function ExpenseDetail({ expense, onClose, formatCurrency }: ExpenseDetai
             </span>
           </div>
 
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide">Status</p>
+            <span
+              className={`inline-block mt-1 text-xs font-medium px-2.5 py-1 rounded ${
+                expense.reimbursed
+                  ? 'text-green-700 bg-green-50'
+                  : 'text-amber-700 bg-amber-50'
+              }`}
+            >
+              {expense.reimbursed ? 'Reimbursed' : 'Unreimbursed'}
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
