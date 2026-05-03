@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ExpenseForm } from '../components/ExpenseForm'
+import { ExpenseLedger } from '../components/ExpenseLedger'
 import type { CareRecipient, Expense } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -73,9 +74,6 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
     )
   }
 
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
@@ -116,7 +114,7 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900">Expenses</h3>
+          <h3 className="text-base font-semibold text-gray-900">Expense Ledger</h3>
           {!showForm && (
             <button
               onClick={() => setShowForm(true)}
@@ -142,46 +140,10 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
           />
         )}
 
-        {expenses.length === 0 && !showForm ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 mb-2">No expenses yet</p>
-            <p className="text-sm text-gray-400">Log your first expense to start tracking</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {expenses.map(exp => (
-              <div key={exp.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{formatCurrency(exp.amount)}</p>
-                    <p className="text-sm text-gray-500">{exp.vendor}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                      {exp.category}
-                    </span>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(exp.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                {exp.notes && (
-                  <p className="text-sm text-gray-600 mt-2 border-t border-gray-100 pt-2">{exp.notes}</p>
-                )}
-                {exp.receipt_url && (
-                  <a
-                    href={exp.receipt_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-xs text-indigo-600 hover:underline mt-2"
-                  >
-                    View receipt
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <ExpenseLedger
+          expenses={expenses}
+          onLogExpense={() => setShowForm(true)}
+        />
       </main>
     </div>
   )
