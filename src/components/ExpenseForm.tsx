@@ -2,6 +2,8 @@ import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { EXPENSE_CATEGORIES } from '../lib/types'
 import type { ExpenseCategory } from '../lib/types'
+import { scanReceipt } from '../lib/ocr'
+import type { OcrResult } from '../lib/ocr'
 
 interface ExpenseFormProps {
   careRecipientId: string
@@ -22,6 +24,11 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
   const [errors, setErrors] = useState<Record<string, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [scanning, setScanning] = useState(false)
+  const [ocrResult, setOcrResult] = useState<OcrResult | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
+
   const validate = (): Record<string, string> => {
     const errs: Record<string, string> = {}
     const parsed = parseFloat(amount)
@@ -36,6 +43,34 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
     return errs
   }
 
+  const handleScanReceipt = async (file: File) => {
+    setScanning(true)
+    setOcrResult(null)
+    setErrors({})
+    setReceiptFile(file)
+
+    const url = URL.createObjectURL(file)
+    setReceiptPreview(url)
+
+    try {
+      const result = await scanReceipt(file)
+      setOcrResult(result)
+
+      if (result.amount) setAmount(result.amount)
+      if (result.date) setDate(result.date)
+      if (result.vendor) setVendor(result.vendor)
+    } catch {
+      setErrors({ ocr: 'Could not read receipt. You can still fill in the details manually.' })
+    }
+
+    setScanning(false)
+  }
+
+  const handleScanInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleScanReceipt(file)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const errs = validate()
@@ -45,7 +80,6 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
     setSaving(true)
 
     try {
-      // Duplicate check: same amount + date + vendor within last 10 seconds
       const tenSecondsAgo = new Date(Date.now() - 10_000).toISOString()
       const { data: dupes } = await supabase
         .from('expenses')
@@ -97,9 +131,10 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
       if (error) {
         setErrors({ form: error.message })
       } else {
+        if (receiptPreview) URL.revokeObjectURL(receiptPreview)
         onSaved()
       }
-    } catch (err) {
+    } catch {
       setErrors({ form: 'Something went wrong. Please try again.' })
     }
 
@@ -113,6 +148,91 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
       {errors.form && (
         <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3">{errors.form}</div>
       )}
+
+      {/* Receipt scan section */}
+      <div className="bg-indigo-50 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-indigo-900">Scan receipt to auto-fill</span>
+          {ocrResult && !scanning && (
+            <span className="text-xs text-indigo-600 font-medium">Fields updated</span>
+          )}
+        </div>
+
+        <input
+          ref={scanInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleScanInputChange}
+          className="hidden"
+        />
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={scanning}
+            onClick={() => scanInputRef.current?.click()}
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-lg py-2 px-3 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M1 8a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.664-.89l.812-1.22A2 2 0 0 1 8.07 3h3.86a2 2 0 0 1 1.664.89l.812 1.22A2 2 0 0 0 16.07 6H17a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8Z" />
+              <path d="M10 14.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+            </svg>
+            {scanning ? 'Scanning...' : 'Take photo'}
+          </button>
+          <button
+            type="button"
+            disabled={scanning}
+            onClick={() => {
+              if (scanInputRef.current) {
+                scanInputRef.current.removeAttribute('capture')
+                scanInputRef.current.click()
+                setTimeout(() => scanInputRef.current?.setAttribute('capture', 'environment'), 100)
+              }
+            }}
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-white text-indigo-700 border border-indigo-300 rounded-lg py-2 px-3 text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M1 8a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.664-.89l.812-1.22A2 2 0 0 1 8.07 3h3.86a2 2 0 0 1 1.664.89l.812 1.22A2 2 0 0 0 16.07 6H17a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8Zm12.5 3a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" clipRule="evenodd" />
+            </svg>
+            {scanning ? 'Scanning...' : 'Upload image'}
+          </button>
+        </div>
+
+        {scanning && (
+          <div className="flex items-center gap-2 text-sm text-indigo-700">
+            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Reading receipt...
+          </div>
+        )}
+
+        {errors.ocr && (
+          <p className="text-sm text-amber-700 bg-amber-50 rounded p-2">{errors.ocr}</p>
+        )}
+
+        {receiptPreview && !scanning && (
+          <div className="relative">
+            <img
+              src={receiptPreview}
+              alt="Receipt preview"
+              className="w-full max-h-32 object-cover rounded-lg border border-indigo-200"
+            />
+            {ocrResult && (
+              <div className="mt-2 text-xs text-indigo-600 space-y-0.5">
+                {ocrResult.amount && <p>Amount: ${ocrResult.amount}</p>}
+                {ocrResult.date && <p>Date: {ocrResult.date}</p>}
+                {ocrResult.vendor && <p>Vendor: {ocrResult.vendor}</p>}
+                {!ocrResult.amount && !ocrResult.date && !ocrResult.vendor && (
+                  <p className="text-amber-600">No fields detected — please fill in manually</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div>
         <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
@@ -212,27 +332,29 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
         </button>
       </div>
 
-      <div>
-        <label htmlFor="receipt" className="block text-sm font-medium text-gray-700 mb-1">
-          Receipt photo
-        </label>
-        <input
-          id="receipt"
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={e => setReceiptFile(e.target.files?.[0] ?? null)}
-          className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
-        />
-        {receiptFile && (
-          <p className="text-xs text-gray-400 mt-1">{receiptFile.name}</p>
-        )}
-      </div>
+      {!receiptFile && (
+        <div>
+          <label htmlFor="receipt" className="block text-sm font-medium text-gray-700 mb-1">
+            Receipt photo
+          </label>
+          <input
+            id="receipt"
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={e => setReceiptFile(e.target.files?.[0] ?? null)}
+            className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+          />
+        </div>
+      )}
+      {receiptFile && !receiptPreview && (
+        <p className="text-xs text-gray-400">{receiptFile.name}</p>
+      )}
 
       <div className="flex gap-3">
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || scanning}
           className="flex-1 bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
           {saving ? 'Saving...' : 'Save expense'}
