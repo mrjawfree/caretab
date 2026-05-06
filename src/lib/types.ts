@@ -9,23 +9,34 @@ export interface CareRecipient {
 }
 
 export type ExpenseCategory =
+  | 'Vision'
+  | 'Dental'
   | 'Medical'
-  | 'Pharmacy'
-  | 'Transportation'
-  | 'Food'
-  | 'Housing'
-  | 'Personal Care'
+  | 'Prescriptions'
   | 'Other'
+  | 'Uncategorized'
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  'Vision',
+  'Dental',
   'Medical',
-  'Pharmacy',
-  'Transportation',
-  'Food',
-  'Housing',
-  'Personal Care',
+  'Prescriptions',
   'Other',
 ]
+
+export const ALL_EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  ...EXPENSE_CATEGORIES,
+  'Uncategorized',
+]
+
+export const CATEGORY_ICONS: Record<ExpenseCategory, string> = {
+  Vision: '👁',
+  Dental: '🦷',
+  Medical: '🏥',
+  Prescriptions: '💊',
+  Other: '📋',
+  Uncategorized: '—',
+}
 
 export interface Expense {
   id: string
