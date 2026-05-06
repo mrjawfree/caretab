@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { EXPENSE_CATEGORIES } from '../lib/types'
+import { useMemo, useState, useRef, useEffect } from 'react'
+import { ALL_EXPENSE_CATEGORIES, CATEGORY_ICONS } from '../lib/types'
 import type { Expense, ExpenseCategory, ReimbursementFilter } from '../lib/types'
 import { ExpenseDetail } from './ExpenseDetail'
 import { exportCSV, exportPDF } from '../lib/exportLedger'
@@ -34,7 +34,9 @@ function getEarliestYear(expenses: Expense[]): number {
 export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedgerProps) {
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(currentYear)
-  const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | 'All'>('All')
+  const [selectedCategories, setSelectedCategories] = useState<Set<ExpenseCategory>>(new Set())
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false)
+  const categoryFilterRef = useRef<HTMLDivElement>(null)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const earliestYear = useMemo(() => getEarliestYear(expenses), [expenses])
   const [startDate, setStartDate] = useState(`${earliestYear}-01-01`)
@@ -44,14 +46,35 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
 
   const availableYears = useMemo(() => getAvailableYears(expenses), [expenses])
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (categoryFilterRef.current && !categoryFilterRef.current.contains(e.target as Node)) {
+        setShowCategoryFilter(false)
+      }
+    }
+    if (showCategoryFilter) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showCategoryFilter])
+
+  const toggleCategory = (cat: ExpenseCategory) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+  }
+
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
       const year = new Date(e.date).getFullYear()
       if (year !== selectedYear) return false
-      if (selectedCategory !== 'All' && e.category !== selectedCategory) return false
+      if (selectedCategories.size > 0 && !selectedCategories.has(e.category)) return false
       return true
     })
-  }, [expenses, selectedYear, selectedCategory])
+  }, [expenses, selectedYear, selectedCategories])
 
   const ytdTotal = useMemo(() => {
     return expenses
@@ -63,13 +86,13 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
     return expenses
       .filter(e => {
         if (e.date < startDate || e.date > endDate) return false
-        if (selectedCategory !== 'All' && e.category !== selectedCategory) return false
+        if (selectedCategories.size > 0 && !selectedCategories.has(e.category)) return false
         if (reimbursementFilter === 'Reimbursed' && !e.reimbursed) return false
         if (reimbursementFilter === 'Unreimbursed' && e.reimbursed) return false
         return true
       })
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [expenses, startDate, endDate, selectedCategory, reimbursementFilter])
+  }, [expenses, startDate, endDate, selectedCategories, reimbursementFilter])
 
   const exportTotal = useMemo(
     () => exportExpenses.reduce((sum, e) => sum + e.amount, 0),
@@ -78,7 +101,7 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
 
   const groupedExpenses = useMemo(() => {
     const groups: Record<string, { expenses: Expense[]; subtotal: number }> = {}
-    for (const cat of EXPENSE_CATEGORIES) {
+    for (const cat of ALL_EXPENSE_CATEGORIES) {
       const catExpenses = filteredExpenses.filter(e => e.category === cat)
       if (catExpenses.length > 0) {
         groups[cat] = {
@@ -156,17 +179,46 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
-        <select
-          value={selectedCategory}
-          onChange={e => setSelectedCategory(e.target.value as ExpenseCategory | 'All')}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent flex-1"
-          aria-label="Filter by category"
-        >
-          <option value="All">All categories</option>
-          {EXPENSE_CATEGORIES.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        <div className="relative flex-1" ref={categoryFilterRef}>
+          <button
+            onClick={() => setShowCategoryFilter(v => !v)}
+            className={`w-full rounded-lg border px-3 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${selectedCategories.size > 0 ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-300 text-gray-700'}`}
+            aria-label="Filter by category"
+          >
+            {selectedCategories.size === 0
+              ? 'All categories'
+              : selectedCategories.size === 1
+                ? `${CATEGORY_ICONS[[...selectedCategories][0]]} ${[...selectedCategories][0]}`
+                : `${selectedCategories.size} categories`}
+          </button>
+          {showCategoryFilter && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg border border-gray-200 shadow-lg z-20 py-1">
+              {ALL_EXPENSE_CATEGORIES.map(cat => (
+                <label
+                  key={cat}
+                  className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.has(cat)}
+                    onChange={() => toggleCategory(cat)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>{CATEGORY_ICONS[cat]}</span>
+                  <span>{cat}</span>
+                </label>
+              ))}
+              {selectedCategories.size > 0 && (
+                <button
+                  onClick={() => setSelectedCategories(new Set())}
+                  className="w-full text-left px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <button
           onClick={() => setShowExport(v => !v)}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
@@ -218,11 +270,11 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
           )}
           <p className="text-xs text-gray-500 mb-3">
             {exportExpenses.length} expense{exportExpenses.length !== 1 ? 's' : ''} · {formatCurrency(exportTotal)}
-            {selectedCategory !== 'All' && ` · ${selectedCategory} only`}
+            {selectedCategories.size > 0 && ` · ${[...selectedCategories].join(', ')}`}
             {reimbursementFilter !== 'All' && ` · ${reimbursementFilter} only`}
           </p>
           {exportExpenses.length === 0 ? (
-            <p className="text-sm text-gray-400">No expenses found for this date range{selectedCategory !== 'All' ? ` and category` : ''}.</p>
+            <p className="text-sm text-gray-400">No expenses found for this date range{selectedCategories.size > 0 ? ' and selected categories' : ''}.</p>
           ) : (
             <div className="flex gap-3">
               <button
@@ -277,6 +329,9 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
                           <p className="text-xs text-gray-400">
                             {new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </p>
+                          <span className="text-xs text-[#4A7FA5] bg-[#4A7FA5]/10 px-1.5 py-0.5 rounded font-medium">
+                            {CATEGORY_ICONS[exp.category]} {exp.category}
+                          </span>
                           {exp.notes && (
                             <p className="text-xs text-gray-400 truncate">
                               — {exp.notes}
