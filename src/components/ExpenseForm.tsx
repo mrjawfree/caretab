@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { trackExpenseAdded, trackReimbursedFlagToggled } from '../lib/analytics'
 import { EXPENSE_CATEGORIES } from '../lib/types'
 import type { ExpenseCategory } from '../lib/types'
 
@@ -97,6 +98,7 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
       if (error) {
         setErrors({ form: error.message })
       } else {
+        trackExpenseAdded({ category: category as string, has_receipt: !!receiptFile })
         onSaved()
       }
     } catch (err) {
@@ -203,7 +205,7 @@ export function ExpenseForm({ careRecipientId, userId, onSaved, onCancel }: Expe
           type="button"
           role="switch"
           aria-checked={reimbursed}
-          onClick={() => setReimbursed(!reimbursed)}
+          onClick={() => { const next = !reimbursed; setReimbursed(next); trackReimbursedFlagToggled({ reimbursed: next }) }}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reimbursed ? 'bg-indigo-600' : 'bg-gray-200'}`}
         >
           <span

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { EXPENSE_CATEGORIES } from '../lib/types'
+import { trackExportTriggered } from '../lib/analytics'
 import type { Expense, ExpenseCategory, ReimbursementFilter } from '../lib/types'
 import { ExpenseDetail } from './ExpenseDetail'
 import { exportCSV, exportPDF } from '../lib/exportLedger'
@@ -108,6 +109,7 @@ export function ExpenseLedger({ expenses, filerName, onLogExpense }: ExpenseLedg
       spansMultipleYears: exportYears.length > 1,
       reimbursementFilter,
     }
+    trackExportTriggered({ format, expense_count: exportExpenses.length })
     if (format === 'pdf') {
       setExporting(true)
       try {

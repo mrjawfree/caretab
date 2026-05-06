@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { trackOnboardingCompleted } from '../lib/analytics'
 import type { User } from '@supabase/supabase-js'
 
 interface OnboardingProps {
@@ -74,6 +75,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
 
   const handleFinish = () => {
     localStorage.setItem('hasCompletedOnboarding', 'true')
+    trackOnboardingCompleted()
     onComplete()
   }
 
