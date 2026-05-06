@@ -8,6 +8,7 @@ import { ExpenseLedger } from '../components/ExpenseLedger'
 import { InviteForm } from '../components/InviteForm'
 import { MembersList } from '../components/MembersList'
 import { DcfsaProgressTracker } from '../components/DcfsaProgressTracker'
+import { DcfsaYearEndAlert } from '../components/DcfsaYearEndAlert'
 import type { CareRecipient, Expense, CareRecipientMember, MemberRole } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
@@ -174,6 +175,12 @@ export function RecipientDetailPage({ user, onSignOut }: RecipientDetailPageProp
             />
           </>
         )}
+
+        <DcfsaYearEndAlert
+          careRecipientId={recipient.id}
+          expenses={expenses}
+          onAddExpense={canEdit ? () => setShowForm(true) : undefined}
+        />
 
         <DcfsaProgressTracker
           careRecipientId={recipient.id}
