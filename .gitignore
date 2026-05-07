@@ -25,4 +25,5 @@ dist-ssr
 *.sln
 *.sw?
 vitejs-plugin-react-*.tgz
+*.zip
 .vercel
